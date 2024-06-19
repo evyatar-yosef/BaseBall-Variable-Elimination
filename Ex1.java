@@ -1,5 +1,4 @@
 import java.util.*;
-import javax.naming.spi.DirStateFactory;
 
 public class Ex1 {
     static List<String> results = new ArrayList<>();
@@ -136,133 +135,151 @@ public class Ex1 {
 
         return true; // Placeholder return value for variable elimination
     }
-public static double variableElimination(String queryVarName, String queryVarValue, Map<String, String> evidenceMap, List<String> eliminationOrder, Map<String, Node> nodes) {
-    double directResult = checkCPTsForQueryResult(queryVarName, queryVarValue, evidenceMap, nodes);
-    if (directResult >= 0) {
-        String Res = String.format("%.5f", directResult); 
-        String result = Res+","+"0"+","+"0";
-        results.add(result);
-
-        return directResult;  // Return the direct result if found in CPTs
-    }
-        // Step 1: Identify relevant nodes (ancestors of query and evidence variables)
-        Set<String> relevantNodes = new HashSet<>();
-        relevantNodes.add(queryVarName); // Add query variable
-        evidenceMap.keySet().forEach(evVar -> relevantNodes.add(evVar)); // Add all evidence variables
     
-        // Step 2: Find ancestors of relevant nodes
-        Set<String> ancestors = findAncestors(queryVarName, evidenceMap.keySet(), nodes);
-    
+    public static double variableElimination(String queryVarName, String queryVarValue, Map<String, String> evidenceMap, List<String> eliminationOrder, Map<String, Node> nodes) {
+        //     double directResult = checkCPTsForQueryResult(queryVarName, queryVarValue, evidenceMap, nodes);
+        //     if (directResult >= 0) {
+        //         String Res = String.format("%.5f", directResult); 
+        //         String result = Res+","+"0"+","+"0";
+        //         results.add(result);
         
-        // Step 3: Initialize factors for relevant nodes only
-        List<Factor> factors = initializeFactors(nodes, ancestors);
+        //         return directResult;  // Return the direct result if found in CPTs
+        //    }
+                // Step 1: Identify relevant nodes (ancestors of query and evidence variables)
+                Set<String> relevantNodes = new HashSet<>();
+                relevantNodes.add(queryVarName); // Add query variable
+                evidenceMap.keySet().forEach(evVar -> relevantNodes.add(evVar)); // Add all evidence variables
+            
+                // Step 2: Find ancestors of relevant nodes
+                Set<String> ancestors = findAncestors(queryVarName, evidenceMap.keySet(), nodes);
+            
+                
+                // Step 3: Initialize factors for relevant nodes only
+                List<Factor> factors = initializeFactors(nodes, ancestors);
+                for (Factor factor : factors) {
+                    Set<String> factorVariables = new HashSet<>(factor.getVariables());
+            
+                    // Combine query variables and evidence variables
+                    Set<String> allVars = new HashSet<>(evidenceMap.keySet());
+                    allVars.add(queryVarName);
+            
+                    // Check if the factor contains all query variables and evidence variables
+                    if (factorVariables.containsAll(allVars) && factor.getVariables().size() == allVars.size()) {
+                        System.out.println("Factor with all query and evidence variables found:");
+                        factor.printFactor();
+            
+                        // Compute the probability directly from the factor
+                        double result = computeProbabilityFromFactor(factor, queryVarName, queryVarValue);
+                        System.out.printf("Probability: %.5f\n", result);
+                        return result;
+                    }
+                }
+                
+                
+                // Step 4: Apply evidence to each factor
+                applyEvidenceToFactors(factors, evidenceMap,ancestors);
+                
+            
+                // Print factors after applying evidence for debugging
+                System.out.println("Factors after applying evidence:");
+                printFactors(factors);
+            
+                // Step 5: Process each hidden variable in the elimination order
+                int additionCount = 0;
+                int multiplicationCount = 0;
+            
+                for (String hiddenVar : eliminationOrder) {
+                    if (!ancestors.contains(hiddenVar)){
+                        factors.remove(hiddenVar);
+                        continue;
+                    }
         
-
-        // Step 4: Apply evidence to each factor
-        applyEvidenceToFactors(factors, evidenceMap,ancestors);
+                    List<Factor> relevantFactors = findRelevantFactorsHidden(factors, hiddenVar);
+            
+                    // If no relevant factors are found, continue to the next variable
+                    if (relevantFactors.isEmpty()) {
+                        continue;
+                    }
+            
+                    // Remove relevant factors from the list of all factors
+                    factors.removeAll(relevantFactors);
+            
+                    // Debug output for factors being joined
+                    System.out.println("Joining factors containing variable: " + hiddenVar);
+                    printFactors(relevantFactors);
+            
+                    // Use a priority queue to join factors with the smallest intermediate size first
+                    PriorityQueue<Factor> factorQueue = new PriorityQueue<>(Comparator.comparingInt(f -> f.getAssignments().size()));
+                    factorQueue.addAll(relevantFactors);
+            
+                    // Join all relevant factors
+                    while (factorQueue.size() > 1) {
+                        Factor f1 = factorQueue.poll();
+                        Factor f2 = factorQueue.poll();
+                        Factor joinedFactor = f1.join(f2);
+                        multiplicationCount += joinedFactor.getAssignments().size(); // Track multiplication operations
+                        factorQueue.add(joinedFactor);
+                    }
+            
+                    Factor jointFactor = factorQueue.poll();
+            
+                    // Eliminate the hidden variable
+                    Factor newFactor = jointFactor.eliminate(hiddenVar);
+                    additionCount += newFactor.getAssignments().size() ;  // Track addition operations
+            
+                    // Debug output for new factor after elimination
+                    System.out.println("New factor after eliminating variable: " + hiddenVar);
+                    newFactor.printFactor();
+            
+                    // Add the new factor to the list of factors
+                    factors.add(newFactor);
+                }
+            
+                // Print all remaining factors before final join
+                System.out.println("Remaining Factors Before Final Join:");
+                printFactors(factors);
+            
+                // Step 6: Join remaining factors
+                Factor resultFactor = factors.get(0);
+                for (int i = 1; i < factors.size(); i++) {
+                    resultFactor = resultFactor.join(factors.get(i));
+                    multiplicationCount += resultFactor.getAssignments().size();  // Track multiplication operations
+                }    
+                System.out.println("Final Resulting Factor After Joining Remaining Factors:");
+                resultFactor.printFactor();
+            
+                // Step 7: Eliminate evidence variables after final join
+                resultFactor = eliminateEvidenceVariables(resultFactor, evidenceMap, queryVarName);
+            
+                System.out.println("Final Resulting Factor After Eliminating Evidence Variables:");
+                resultFactor.printFactor();
+            
+                // Normalize the result factor
+                double total = 0.0;
+                for (double prob : resultFactor.getProbabilities()) {
+                    total += prob;
+                    additionCount++;  // Track addition operations during normalization
+                }    
+                additionCount --;
+                // Find the probability for the query
+                double queryProbability = 0.0;
+                for (int i = 0; i < resultFactor.getAssignments().size(); i++) {
+                    Map<String, String> assignment = resultFactor.getAssignments().get(i);
+                    if (assignment.get(queryVarName).equals(queryVarValue)) {
+                        queryProbability += resultFactor.getProbabilities().get(i) / total;
+                    }
+                }
+                // Output the result
+              //  System.out.printf("%.5f,%d,%d\n", queryProbability, additionCount, multiplicationCount);
+                String probabilty = String.format("%.5f", queryProbability); 
+                String count =String.valueOf(additionCount);  
+                String mult =String.valueOf(multiplicationCount);  
+                String res = probabilty+","+count+","+mult;
         
-    
-        // Print factors after applying evidence for debugging
-        System.out.println("Factors after applying evidence:");
-        printFactors(factors);
-    
-        // Step 5: Process each hidden variable in the elimination order
-        int additionCount = 0;
-        int multiplicationCount = 0;
-    
-        for (String hiddenVar : eliminationOrder) {
-            if (!ancestors.contains(hiddenVar)){
-                factors.remove(hiddenVar);
-                continue;
+                results.add(res);
+            
+                return queryProbability;
             }
-
-            List<Factor> relevantFactors = findRelevantFactors(factors, hiddenVar);
-    
-            // If no relevant factors are found, continue to the next variable
-            if (relevantFactors.isEmpty()) {
-                continue;
-            }
-    
-            // Remove relevant factors from the list of all factors
-            factors.removeAll(relevantFactors);
-    
-            // Debug output for factors being joined
-            System.out.println("Joining factors containing variable: " + hiddenVar);
-            printFactors(relevantFactors);
-    
-            // Use a priority queue to join factors with the smallest intermediate size first
-            PriorityQueue<Factor> factorQueue = new PriorityQueue<>(Comparator.comparingInt(f -> f.getAssignments().size()));
-            factorQueue.addAll(relevantFactors);
-    
-            // Join all relevant factors
-            while (factorQueue.size() > 1) {
-                Factor f1 = factorQueue.poll();
-                Factor f2 = factorQueue.poll();
-                Factor joinedFactor = f1.join(f2);
-                multiplicationCount += joinedFactor.getAssignments().size(); // Track multiplication operations
-                factorQueue.add(joinedFactor);
-            }
-    
-            Factor jointFactor = factorQueue.poll();
-    
-            // Eliminate the hidden variable
-            Factor newFactor = jointFactor.eliminate(hiddenVar);
-            additionCount += newFactor.getAssignments().size() ;  // Track addition operations
-    
-            // Debug output for new factor after elimination
-            System.out.println("New factor after eliminating variable: " + hiddenVar);
-            newFactor.printFactor();
-    
-            // Add the new factor to the list of factors
-            factors.add(newFactor);
-        }
-    
-        // Print all remaining factors before final join
-        System.out.println("Remaining Factors Before Final Join:");
-        printFactors(factors);
-    
-        // Step 6: Join remaining factors
-        Factor resultFactor = factors.get(0);
-        for (int i = 1; i < factors.size(); i++) {
-            resultFactor = resultFactor.join(factors.get(i));
-            multiplicationCount += resultFactor.getAssignments().size();  // Track multiplication operations
-        }    
-        System.out.println("Final Resulting Factor After Joining Remaining Factors:");
-        resultFactor.printFactor();
-    
-        // Step 7: Eliminate evidence variables after final join
-        resultFactor = eliminateEvidenceVariables(resultFactor, evidenceMap, queryVarName);
-    
-        System.out.println("Final Resulting Factor After Eliminating Evidence Variables:");
-        resultFactor.printFactor();
-    
-        // Normalize the result factor
-        double total = 0.0;
-        for (double prob : resultFactor.getProbabilities()) {
-            total += prob;
-            additionCount++;  // Track addition operations during normalization
-        }    
-        additionCount --;
-        // Find the probability for the query
-        double queryProbability = 0.0;
-        for (int i = 0; i < resultFactor.getAssignments().size(); i++) {
-            Map<String, String> assignment = resultFactor.getAssignments().get(i);
-            if (assignment.get(queryVarName).equals(queryVarValue)) {
-                queryProbability += resultFactor.getProbabilities().get(i) / total;
-            }
-        }
-        // Output the result
-      //  System.out.printf("%.5f,%d,%d\n", queryProbability, additionCount, multiplicationCount);
-        String probabilty = String.format("%.5f", queryProbability); 
-        String count =String.valueOf(additionCount);  
-        String mult =String.valueOf(multiplicationCount);  
-        String res = probabilty+","+count+","+mult;
-
-        results.add(res);
-    
-        return queryProbability;
-    }
-    
     private static Set<String> findAncestors(String queryVarName, Set<String> evidenceVars, Map<String, Node> nodes) {
         Set<String> relevantNodes = new HashSet<>();
         relevantNodes.add(queryVarName); // Add query variable
@@ -301,7 +318,7 @@ public static double variableElimination(String queryVarName, String queryVarVal
         }
     }
     
-    private static List<Factor> findRelevantFactors(List<Factor> factors, String hiddenVar) {
+    private static List<Factor> findRelevantFactorsHidden(List<Factor> factors, String hiddenVar) {
         List<Factor> relevantFactors = new ArrayList<>();
         for (Factor factor : factors) {
             if (factor.getVariables().contains(hiddenVar)) {
@@ -337,30 +354,31 @@ public static double variableElimination(String queryVarName, String queryVarVal
         }
     }
     private static double checkCPTsForQueryResult(String queryVarName, String queryVarValue, Map<String, String> evidenceMap, Map<String, Node> nodes) {
-        for (Node node : nodes.values()) {
-            if (node.getName().equals(queryVarName)) {
-                // Retrieve parent values from evidenceMap or use defaults
-                List<String> parentValues = new ArrayList<>();
-                for (Node parent : node.getParents()) {
-                    String parentValue = evidenceMap.get(parent.getName());
-                    if (parentValue == null) {
-                        parentValue = parent.getOutcomes().get(0); // Use default outcome if evidence not provided
-                    }
-                    parentValues.add(parentValue);
-                }
-    
-                // Retrieve CPT values for the node
-                String[] cptValues = node.getCPTValues();
-    
-                // Find the index in CPT corresponding to the parent values and query value
-                int index = indexOfCPTEntry(parentValues, queryVarValue, cptValues, node.getOutcomes());
-    
-                if (index != -1) {
-                    // Probability found in CPT, return it
-                    return Double.parseDouble(cptValues[index]);
-                }
-            }
+        // Check if the query variable exists in the nodes
+        Node queryNode = nodes.get(queryVarName);
+        if (queryNode == null) {
+            return -1; // Query variable not found in nodes
         }
+    
+        // Retrieve parent values from evidenceMap or use defaults
+        List<String> parentValues = new ArrayList<>();
+        for (Node parent : queryNode.getParents()) {
+            String parentValue = evidenceMap.get(parent.getName());
+            
+            parentValues.add(parentValue);
+        }
+    
+        // Retrieve CPT values for the query node
+        String[] cptValues = queryNode.getCPTValues();
+    
+        // Find the index in CPT corresponding to the parent values and query value
+        int index = indexOfCPTEntry(parentValues, queryVarValue, cptValues, queryNode.getOutcomes());
+        System.out.println("index:" + index);
+        if (index != -1) {
+            // Probability found in CPT, return it
+            return Double.parseDouble(cptValues[index]);
+        }
+    
         return -1; // Indicate that result was not found in any CPT
     }
     
@@ -369,7 +387,9 @@ public static double variableElimination(String queryVarName, String queryVarVal
         int index = 0;
         int numParents = parentValues.size();
         int numOutcomes = outcomes.size();
-    
+        System.out.println("numParents:" + parentValues.size());
+        System.out.println("numOutcomes:" + numOutcomes);
+              
         for (int i = 0; i < numParents; i++) {
             int outcomeIndex = outcomes.indexOf(parentValues.get(i));
             if (outcomeIndex == -1) {
@@ -388,4 +408,26 @@ public static double variableElimination(String queryVarName, String queryVarVal
     }
     
     
+    private static double computeProbabilityFromFactor(Factor factor, String queryVarName, String queryVarValue) {
+        System.out.println("");
+        double totalProbability = 0.0;
+        double queryProbability = 0.0;
+    
+        for (int i = 0; i < factor.getAssignments().size(); i++) {
+            Map<String, String> assignment = factor.getAssignments().get(i);
+            double probability = factor.getProbabilities().get(i);
+    
+            if (assignment.containsKey(queryVarName) && assignment.get(queryVarName).equals(queryVarValue)) {
+                queryProbability += probability;
+            }
+    
+            totalProbability += probability;
+        }
+    
+        if (totalProbability > 0.0) {
+            queryProbability /= totalProbability;
+        }
+    
+        return queryProbability;
+    }
     }

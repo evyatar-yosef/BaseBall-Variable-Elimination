@@ -1,7 +1,4 @@
-alarm_net.xml
-B-E|
-B-E|J=T
-P(B=T|J=T,M=T) A-E
-P(B=T|J=T,M=T) E-A
-P(J=T|B=T) A-E-M
-P(J=T|B=T) M-E-A
+big_net.xml
+B0-C2|A2=T,A3=T
+A1-D1|C3=T,B2=F,B3=F
+P(B0=v3|C3=T,B2=F,C2=v3) A2-D1-B3-C1-A1-B1-A3
