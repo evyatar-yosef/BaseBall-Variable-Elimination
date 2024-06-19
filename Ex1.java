@@ -137,6 +137,14 @@ public class Ex1 {
         return true; // Placeholder return value for variable elimination
     }
 public static double variableElimination(String queryVarName, String queryVarValue, Map<String, String> evidenceMap, List<String> eliminationOrder, Map<String, Node> nodes) {
+    double directResult = checkCPTsForQueryResult(queryVarName, queryVarValue, evidenceMap, nodes);
+    if (directResult >= 0) {
+        String Res = String.format("%.5f", directResult); 
+        String result = Res+","+"0"+","+"0";
+        results.add(result);
+
+        return directResult;  // Return the direct result if found in CPTs
+    }
         // Step 1: Identify relevant nodes (ancestors of query and evidence variables)
         Set<String> relevantNodes = new HashSet<>();
         relevantNodes.add(queryVarName); // Add query variable
@@ -328,5 +336,56 @@ public static double variableElimination(String queryVarName, String queryVarVal
             }
         }
     }
+    private static double checkCPTsForQueryResult(String queryVarName, String queryVarValue, Map<String, String> evidenceMap, Map<String, Node> nodes) {
+        for (Node node : nodes.values()) {
+            if (node.getName().equals(queryVarName)) {
+                // Retrieve parent values from evidenceMap or use defaults
+                List<String> parentValues = new ArrayList<>();
+                for (Node parent : node.getParents()) {
+                    String parentValue = evidenceMap.get(parent.getName());
+                    if (parentValue == null) {
+                        parentValue = parent.getOutcomes().get(0); // Use default outcome if evidence not provided
+                    }
+                    parentValues.add(parentValue);
+                }
+    
+                // Retrieve CPT values for the node
+                String[] cptValues = node.getCPTValues();
+    
+                // Find the index in CPT corresponding to the parent values and query value
+                int index = indexOfCPTEntry(parentValues, queryVarValue, cptValues, node.getOutcomes());
+    
+                if (index != -1) {
+                    // Probability found in CPT, return it
+                    return Double.parseDouble(cptValues[index]);
+                }
+            }
+        }
+        return -1; // Indicate that result was not found in any CPT
+    }
+    
+    private static int indexOfCPTEntry(List<String> parentValues, String queryVarValue, String[] cptValues, List<String> outcomes) {
+        // Calculate the index in CPT array for given parent values and query variable value
+        int index = 0;
+        int numParents = parentValues.size();
+        int numOutcomes = outcomes.size();
+    
+        for (int i = 0; i < numParents; i++) {
+            int outcomeIndex = outcomes.indexOf(parentValues.get(i));
+            if (outcomeIndex == -1) {
+                return -1; // Parent value not found in outcomes
+            }
+            index = index * numOutcomes + outcomeIndex;
+        }
+    
+        int queryVarIndex = outcomes.indexOf(queryVarValue);
+        if (queryVarIndex == -1) {
+            return -1; // Query variable value not found in outcomes
+        }
+    
+        index = index * numOutcomes + queryVarIndex;
+        return index;
+    }
+    
     
     }
