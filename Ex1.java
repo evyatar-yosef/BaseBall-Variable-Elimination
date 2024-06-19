@@ -1,7 +1,11 @@
 import java.util.*;
+import javax.naming.spi.DirStateFactory;
 
 public class Ex1 {
+    static List<String> results = new ArrayList<>();
     public static void main(String[] args) {
+        // List<String> results = new ArrayList<>(); // List to collect the results
+
         try {
             // Create an instance of InputParser and read the input file
             InputParser ip = new InputParser("input.txt");
@@ -15,26 +19,32 @@ public class Ex1 {
             // Process queries and perform d-separation tests
             for (String query : ip.getQueries()) {
                 // Perform d-separation test for each query
-                boolean isDConnected = processQuery(query, nodes);
-                System.out.println("For query: " + query + ", Nodes are d-connected: " + isDConnected);
+                 processQuery(query, nodes);
+              
             }
+
+            // Write the results to the output file
+            OutputWriter.writeOutput(results);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static boolean processQuery(String query, Map<String, Node> nodes) {
+    
+
+    private static void  processQuery(String query, Map<String, Node> nodes) {
         // Check if the query starts with "P" for variable elimination
         if (query.startsWith("P")) {
             // Implement variable elimination here
             System.out.println("Performing Variable Elimination for query: " + query);
-            return processVariableEliminationQuery(query, nodes);
+             processVariableEliminationQuery(query, nodes);
         } else {
             // Split the query into relevant components for BayesBall
             String[] queryParts = query.split("\\|");
             if (queryParts.length < 1) {
                 System.out.println("Invalid query format: " + query);
-                return false;
+                return ;
             }
             String[] nodeNames = queryParts[0].trim().split("-");
             String[] evidence = new String[0]; // Default to no evidence
@@ -62,8 +72,11 @@ public class Ex1 {
                     System.out.println("Invalid evidence format: " + evidenceNode);
                 }
             }
+            boolean resu = BayesBall.isIndependent(node1, node2, evidenceNodes);
+            String result = resu ? "yes" : "no";
+            results.add(result);
 
-            return BayesBall.isIndependent(node1, node2, evidenceNodes);
+          //  return BayesBall.isIndependent(node1, node2, evidenceNodes);
 
         }
     }
@@ -136,9 +149,10 @@ public static double variableElimination(String queryVarName, String queryVarVal
         // Step 3: Initialize factors for relevant nodes only
         List<Factor> factors = initializeFactors(nodes, ancestors);
         
-        
+
         // Step 4: Apply evidence to each factor
         applyEvidenceToFactors(factors, evidenceMap,ancestors);
+        
     
         // Print factors after applying evidence for debugging
         System.out.println("Factors after applying evidence:");
@@ -230,7 +244,13 @@ public static double variableElimination(String queryVarName, String queryVarVal
             }
         }
         // Output the result
-        System.out.printf("%.5f,%d,%d\n", queryProbability, additionCount, multiplicationCount);
+      //  System.out.printf("%.5f,%d,%d\n", queryProbability, additionCount, multiplicationCount);
+        String probabilty = String.format("%.5f", queryProbability); 
+        String count =String.valueOf(additionCount);  
+        String mult =String.valueOf(multiplicationCount);  
+        String res = probabilty+","+count+","+mult;
+
+        results.add(res);
     
         return queryProbability;
     }

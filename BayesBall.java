@@ -11,7 +11,11 @@ public class BayesBall {
             node.setFromChild(false);
         }
 
-        
+        // System.out.println("Evidence nodes:");
+        // for (Node evidenceNode : evidenceNodes) {
+        //     System.out.println("- " + evidenceNode.getName());
+        // }
+
         Queue<Node> queue = new LinkedList<>();
         queue.add(startNode);
 

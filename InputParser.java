@@ -23,7 +23,7 @@ public class InputParser {
     }
 
     public String getXmlFile() {
-        return "alarm_net.xml";
+        return xmlFile;
     }
 
     public List<String> getQueries() {
