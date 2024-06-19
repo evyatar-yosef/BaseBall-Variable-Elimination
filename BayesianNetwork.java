@@ -1,6 +1,7 @@
 import org.w3c.dom.*;
-import javax.xml.parsers.DocumentBuilderFactory;
+
 import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
 import java.util.*;
 
@@ -37,17 +38,20 @@ public class BayesianNetwork {
             String forNode = definitionElement.getElementsByTagName("FOR").item(0).getTextContent();
             Node node = nodes.get(forNode);
             NodeList givenList = definitionElement.getElementsByTagName("GIVEN");
+            List<Node> parents = new ArrayList<>();
             for (int j = 0; j < givenList.getLength(); j++) {
                 String parentName = givenList.item(j).getTextContent();
                 Node parentNode = nodes.get(parentName);
-                node.addParent(parentNode);
-                parentNode.addChild(node); // הוספת הילד לרשימת הילדים של ההורה
+                parents.add(parentNode);
+                parentNode.addChild(node);
             }
+            node.getParents().addAll(parents);
+
             String[] tableValues = definitionElement.getElementsByTagName("TABLE").item(0).getTextContent().split(" ");
             node.setCPTValues(tableValues);
         }
 
-        // הדפס את מבנה הרשת
+        // Print the parsed Bayesian Network structure
         System.out.println("Bayesian Network:");
         for (Node node : nodes.values()) {
             System.out.println(node);
@@ -60,6 +64,8 @@ public class BayesianNetwork {
 
     @Override
     public String toString() {
-        return "BayesianNetwork{" + "nodes=" + nodes + '}';
+        return "BayesianNetwork{" +
+                "nodes=" + nodes +
+                '}';
     }
 }

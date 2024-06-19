@@ -11,11 +11,7 @@ public class BayesBall {
             node.setFromChild(false);
         }
 
-        // System.out.println("Evidence nodes:");
-        // for (Node evidenceNode : evidenceNodes) {
-        //     System.out.println("- " + evidenceNode.getName());
-        // }
-
+        
         Queue<Node> queue = new LinkedList<>();
         queue.add(startNode);
 
@@ -54,7 +50,7 @@ public class BayesBall {
         return true;
     }
 
-    private static List<Node> getAllNodes(Node startNode) {
+    static List<Node> getAllNodes(Node startNode) {
         Set<Node> nodes = new HashSet<>();
         Queue<Node> queue = new LinkedList<>();
         queue.add(startNode);

@@ -88,4 +88,7 @@ public class Node {
     public String[] getCPTValues() {
         return cptValues;
     }
+    public int getOutcomeCount() {
+        return outcomes.size();
+    }
 }

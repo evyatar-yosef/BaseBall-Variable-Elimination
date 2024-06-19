@@ -41,7 +41,7 @@ public class Ex1 {
             if (queryParts.length > 1) {
                 evidence = queryParts[1].trim().split(",");
             }
-            
+
             // Get the nodes for the query
             Node node1 = nodes.get(nodeNames[0].trim());
             Node node2 = nodes.get(nodeNames[1].trim());
@@ -62,10 +62,9 @@ public class Ex1 {
                     System.out.println("Invalid evidence format: " + evidenceNode);
                 }
             }
-            
-                       
+
             return BayesBall.isIndependent(node1, node2, evidenceNodes);
-           
+
         }
     }
 
@@ -124,99 +123,190 @@ public class Ex1 {
 
         return true; // Placeholder return value for variable elimination
     }
-
-    public static double variableElimination(String queryVarName, String queryVarValue, Map<String, String> evidenceMap, List<String> eliminationOrder, Map<String, Node> nodes) {
-        // Step 1: Initialize factors
-        List<Factor> factors = new ArrayList<>();
-        for (Node node : nodes.values()) {
-            factors.add(Factor.fromNode(node));
-        }
-
-        // System.out.println("print cpt");
-        // for (Factor factor : factors) {
-        //     factor.printFactor();
-        // }
-        // Step 2: Apply evidence to each factor
-        
-        for (Factor factor : factors) {
-            factor.applyEvidence(evidenceMap);
-            
-            // Remove columns corresponding to evidence variables
-            // for (String evVar : evidenceMap.keySet()) {
-            //     if (nodes.containsKey(evVar)) {
-            //         factor.removeVariable(evVar);
-            //     }
-            // }
-        }
+public static double variableElimination(String queryVarName, String queryVarValue, Map<String, String> evidenceMap, List<String> eliminationOrder, Map<String, Node> nodes) {
+        // Step 1: Identify relevant nodes (ancestors of query and evidence variables)
+        Set<String> relevantNodes = new HashSet<>();
+        relevantNodes.add(queryVarName); // Add query variable
+        evidenceMap.keySet().forEach(evVar -> relevantNodes.add(evVar)); // Add all evidence variables
     
+        // Step 2: Find ancestors of relevant nodes
+        Set<String> ancestors = findAncestors(queryVarName, evidenceMap.keySet(), nodes);
+    
+        
+        // Step 3: Initialize factors for relevant nodes only
+        List<Factor> factors = initializeFactors(nodes, ancestors);
+        
+        
+        // Step 4: Apply evidence to each factor
+        applyEvidenceToFactors(factors, evidenceMap,ancestors);
+    
+        // Print factors after applying evidence for debugging
+        System.out.println("Factors after applying evidence:");
+        printFactors(factors);
+    
+        // Step 5: Process each hidden variable in the elimination order
         int additionCount = 0;
         int multiplicationCount = 0;
     
-        // Step 3: Process each hidden variable
         for (String hiddenVar : eliminationOrder) {
-            List<Factor> relevantFactors = new ArrayList<>();
+            if (!ancestors.contains(hiddenVar)){
+                factors.remove(hiddenVar);
+                continue;
+            }
+
+            List<Factor> relevantFactors = findRelevantFactors(factors, hiddenVar);
     
-            // Find all factors that involve the hidden variable
-            for (Factor factor : factors) {
-                if (factor.getVariables().contains(hiddenVar)) {
-                    relevantFactors.add(factor);
-                }
+            // If no relevant factors are found, continue to the next variable
+            if (relevantFactors.isEmpty()) {
+                continue;
             }
     
             // Remove relevant factors from the list of all factors
             factors.removeAll(relevantFactors);
     
+            // Debug output for factors being joined
+            System.out.println("Joining factors containing variable: " + hiddenVar);
+            printFactors(relevantFactors);
+    
+            // Use a priority queue to join factors with the smallest intermediate size first
+            PriorityQueue<Factor> factorQueue = new PriorityQueue<>(Comparator.comparingInt(f -> f.getAssignments().size()));
+            factorQueue.addAll(relevantFactors);
+    
             // Join all relevant factors
-            Factor jointFactor = relevantFactors.get(0);
-            for (int i = 1; i < relevantFactors.size(); i++) {
-                jointFactor = jointFactor.join(relevantFactors.get(i));
-                multiplicationCount += jointFactor.getAssignments().size();  // Track multiplication operations
+            while (factorQueue.size() > 1) {
+                Factor f1 = factorQueue.poll();
+                Factor f2 = factorQueue.poll();
+                Factor joinedFactor = f1.join(f2);
+                multiplicationCount += joinedFactor.getAssignments().size(); // Track multiplication operations
+                factorQueue.add(joinedFactor);
             }
+    
+            Factor jointFactor = factorQueue.poll();
     
             // Eliminate the hidden variable
             Factor newFactor = jointFactor.eliminate(hiddenVar);
-            additionCount += newFactor.getAssignments().size();  // Track addition operations
+            additionCount += newFactor.getAssignments().size() ;  // Track addition operations
+    
+            // Debug output for new factor after elimination
+            System.out.println("New factor after eliminating variable: " + hiddenVar);
+            newFactor.printFactor();
     
             // Add the new factor to the list of factors
             factors.add(newFactor);
         }
-        
-        // Print all remaining factors before stage 4
-System.out.println("Remaining Factors Before Join:");
-for (Factor factor : factors) {
-    factor.printFactor();
-}
-
-        // Step 4: Join remaining factors
+    
+        // Print all remaining factors before final join
+        System.out.println("Remaining Factors Before Final Join:");
+        printFactors(factors);
+    
+        // Step 6: Join remaining factors
         Factor resultFactor = factors.get(0);
         for (int i = 1; i < factors.size(); i++) {
             resultFactor = resultFactor.join(factors.get(i));
             multiplicationCount += resultFactor.getAssignments().size();  // Track multiplication operations
-        }
+        }    
         System.out.println("Final Resulting Factor After Joining Remaining Factors:");
-resultFactor.printFactor();
+        resultFactor.printFactor();
+    
+        // Step 7: Eliminate evidence variables after final join
+        resultFactor = eliminateEvidenceVariables(resultFactor, evidenceMap, queryVarName);
+    
+        System.out.println("Final Resulting Factor After Eliminating Evidence Variables:");
+        resultFactor.printFactor();
     
         // Normalize the result factor
         double total = 0.0;
         for (double prob : resultFactor.getProbabilities()) {
             total += prob;
             additionCount++;  // Track addition operations during normalization
-        }
-    
+        }    
+        additionCount --;
         // Find the probability for the query
         double queryProbability = 0.0;
         for (int i = 0; i < resultFactor.getAssignments().size(); i++) {
             Map<String, String> assignment = resultFactor.getAssignments().get(i);
             if (assignment.get(queryVarName).equals(queryVarValue)) {
-                queryProbability = resultFactor.getProbabilities().get(i) / total;
+                queryProbability += resultFactor.getProbabilities().get(i) / total;
             }
         }
-    
         // Output the result
         System.out.printf("%.5f,%d,%d\n", queryProbability, additionCount, multiplicationCount);
     
         return queryProbability;
     }
     
+    private static Set<String> findAncestors(String queryVarName, Set<String> evidenceVars, Map<String, Node> nodes) {
+        Set<String> relevantNodes = new HashSet<>();
+        relevantNodes.add(queryVarName); // Add query variable
+        evidenceVars.forEach(evVar -> relevantNodes.add(evVar)); // Add all evidence variables
     
-}
+        Set<String> ancestors = new HashSet<>();
+        relevantNodes.forEach(var -> gatherAncestors(nodes.get(var), ancestors));
+    
+        return ancestors;
+    }
+    
+    private static List<Factor> initializeFactors(Map<String, Node> nodes, Set<String> ancestors) {
+        List<Factor> factors = new ArrayList<>();
+        for (Node node : nodes.values()) {
+            if (ancestors.contains(node.getName())) {
+                factors.add(Factor.fromNode(node));
+            }
+        }
+        return factors;
+    }
+    
+    private static void applyEvidenceToFactors(List<Factor> factors, Map<String, String> evidenceMap, Set<String>ancestors) {
+        for (Factor factor : factors) {
+            if(!ancestors.contains(factor.getName()))
+            {
+                factors.remove(factor);
+                continue;
+            }
+            factor.applyEvidence(evidenceMap);
+        }
+    }
+    
+    private static void printFactors(List<Factor> factors) {
+        for (Factor factor : factors) {
+            factor.printFactor();
+        }
+    }
+    
+    private static List<Factor> findRelevantFactors(List<Factor> factors, String hiddenVar) {
+        List<Factor> relevantFactors = new ArrayList<>();
+        for (Factor factor : factors) {
+            if (factor.getVariables().contains(hiddenVar)) {
+                relevantFactors.add(factor);
+            }
+        }
+        return relevantFactors;
+    }
+    
+   
+    
+    private static Factor eliminateEvidenceVariables(Factor resultFactor, Map<String, String> evidenceMap, String queryVarName) {
+        for (String evVar : evidenceMap.keySet()) {
+            if (resultFactor.getVariables().contains(evVar) && !evVar.equals(queryVarName)) {
+                resultFactor = resultFactor.eliminate(evVar);
+            }
+        }
+        return resultFactor;
+    }
+    
+     
+    
+    
+    private static void gatherAncestors(Node node, Set<String> ancestors) {
+        // Add the current node to ancestors set
+        ancestors.add(node.getName());
+    
+        // Recursively add ancestors of all parent nodes
+        for (Node parent : node.getParents()) {
+            if (!ancestors.contains(parent.getName())) {
+                gatherAncestors(parent, ancestors);
+            }
+        }
+    }
+    
+    }
