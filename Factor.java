@@ -6,13 +6,25 @@
         private List<Map<String, String>> assignments;  // Possible assignments of the variables
         private List<Double> probabilities;  // Corresponding probabilities for each assignment
 
+        private static int joinOperationsCount = 0;
+        private static int eliminateOperationsCount = 0;
         public Factor(String name, List<String> variables, List<Map<String, String>> assignments, List<Double> probabilities) {
             this.name = name;
             this.variables = variables;
             this.assignments = assignments;
             this.probabilities = probabilities;
         }
-
+        public static int getAdditionCount() {
+            return joinOperationsCount;
+        }
+    
+        public static int getMultiplicationCount() {
+            return eliminateOperationsCount;
+        }
+        public static void resetOperationCounts() {
+            joinOperationsCount = 0;
+            eliminateOperationsCount = 0;
+        }
         // Method to initialize a factor from a node's CPT
         public static Factor fromNode(Node node) {
             List<String> variables = new ArrayList<>();
@@ -72,7 +84,6 @@
             }
         }
 
-        // Rest of the Factor class remains unchanged
 
         public String getName() {
             return name;
@@ -164,24 +175,26 @@
             this.printFactor();
             System.out.println("Factor 2:");
             factor2.printFactor();
-
+    
             List<String> commonVariables = new ArrayList<>(this.variables);
             commonVariables.retainAll(factor2.variables);
             Set<String> joinedVariableSet = new LinkedHashSet<>(this.variables);
             joinedVariableSet.addAll(factor2.variables);
             List<String> joinedVariables = new ArrayList<>(joinedVariableSet);
-
+    
             List<Map<String, String>> joinedAssignments = new ArrayList<>();
             List<Double> joinedProbabilities = new ArrayList<>();
-
+    
             for (int i = 0; i < this.assignments.size(); i++) {
                 Map<String, String> assignment1 = this.assignments.get(i);
                 double probability1 = this.probabilities.get(i);
-
+    
                 for (int j = 0; j < factor2.assignments.size(); j++) {
                     Map<String, String> assignment2 = factor2.assignments.get(j);
                     double probability2 = factor2.probabilities.get(j);
-
+    
+                    joinOperationsCount++;  // Increment join operation counter
+    
                     boolean compatible = true;
                     for (String var : commonVariables) {
                         if (!assignment1.get(var).equals(assignment2.get(var))) {
@@ -189,7 +202,7 @@
                             break;
                         }
                     }
-
+    
                     if (compatible) {
                         Map<String, String> joinedAssignment = new HashMap<>(assignment1);
                         joinedAssignment.putAll(assignment2);
@@ -199,14 +212,15 @@
                     }
                 }
             }
-
+    
             Factor joinedFactor = new Factor("JoinedFactor", joinedVariables, joinedAssignments, joinedProbabilities);
-
+    
             System.out.println("Resulting Factor After Join:");
             joinedFactor.printFactor();
-
+    
             return joinedFactor;
         }
+    
 
         public Factor eliminate(String variable) {
             System.out.println("Eliminating variable: " + variable);
@@ -224,6 +238,8 @@
             for (int i = 0; i < assignments.size(); i++) {
                 Map<String, String> assignment = assignments.get(i);
                 Map<String, String> newAssignment = new HashMap<>(assignment);
+        
+                eliminateOperationsCount++;  // Increment eliminate operation counter
         
                 // Remove the variable from assignment
                 newAssignment.remove(variable);
@@ -251,5 +267,6 @@
         
             return newFactor;
         }
+        
         
     }

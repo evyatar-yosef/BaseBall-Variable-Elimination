@@ -156,24 +156,24 @@ public class Ex1 {
                 
                 // Step 3: Initialize factors for relevant nodes only
                 List<Factor> factors = initializeFactors(nodes, ancestors);
-                for (Factor factor : factors) {
-                    Set<String> factorVariables = new HashSet<>(factor.getVariables());
+                // for (Factor factor : factors) {
+                //     Set<String> factorVariables = new HashSet<>(factor.getVariables());
             
-                    // Combine query variables and evidence variables
-                    Set<String> allVars = new HashSet<>(evidenceMap.keySet());
-                    allVars.add(queryVarName);
+                //     // Combine query variables and evidence variables
+                //     Set<String> allVars = new HashSet<>(evidenceMap.keySet());
+                //     allVars.add(queryVarName);
             
-                    // Check if the factor contains all query variables and evidence variables
-                    if (factorVariables.containsAll(allVars) && factor.getVariables().size() == allVars.size()) {
-                        System.out.println("Factor with all query and evidence variables found:");
-                        factor.printFactor();
+                //     // Check if the factor contains all query variables and evidence variables
+                //     if (factorVariables.containsAll(allVars) && factor.getVariables().size() == allVars.size()) {
+                //         System.out.println("Factor with all query and evidence variables found:");
+                //         factor.printFactor();
             
-                        // Compute the probability directly from the factor
-                        double result = computeProbabilityFromFactor(factor, queryVarName, queryVarValue);
-                        System.out.printf("Probability: %.5f\n", result);
-                        return result;
-                    }
-                }
+                //         // Compute the probability directly from the factor
+                //         double result = computeProbabilityFromFactor(factor, queryVarName, queryVarValue);
+                //         System.out.printf("Probability: %.5f\n", result);
+                //         return result;
+                //     }
+                // }
                 
                 
                 // Step 4: Apply evidence to each factor
@@ -256,30 +256,41 @@ public class Ex1 {
             
                 // Normalize the result factor
                 double total = 0.0;
+                int count = 0;
                 for (double prob : resultFactor.getProbabilities()) {
                     total += prob;
                     additionCount++;  // Track addition operations during normalization
                 }    
+             //   System.out.println("count----" + count);
                 additionCount --;
                 // Find the probability for the query
                 double queryProbability = 0.0;
                 for (int i = 0; i < resultFactor.getAssignments().size(); i++) {
+                    count++;
                     Map<String, String> assignment = resultFactor.getAssignments().get(i);
                     if (assignment.get(queryVarName).equals(queryVarValue)) {
+                       // count++;
+
                         queryProbability += resultFactor.getProbabilities().get(i) / total;
                     }
                 }
+                System.out.println("count----" + count);
+
                 // Output the result
               //  System.out.printf("%.5f,%d,%d\n", queryProbability, additionCount, multiplicationCount);
+
+               // additionCount = Factor.getAdditionCount();
+                multiplicationCount = Factor.getMultiplicationCount();
                 String probabilty = String.format("%.5f", queryProbability); 
-                String count =String.valueOf(additionCount);  
+                String add =String.valueOf(additionCount);  
                 String mult =String.valueOf(multiplicationCount);  
-                String res = probabilty+","+count+","+mult;
+                String res = probabilty+","+add+","+mult;
         
                 results.add(res);
-            
+                Factor.resetOperationCounts();
                 return queryProbability;
             }
+
     private static Set<String> findAncestors(String queryVarName, Set<String> evidenceVars, Map<String, Node> nodes) {
         Set<String> relevantNodes = new HashSet<>();
         relevantNodes.add(queryVarName); // Add query variable
